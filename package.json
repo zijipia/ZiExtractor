@@ -1,0 +1,23 @@
+{
+  "name": "ziextractor",
+  "version": "1.0.0",
+  "description": "Extractor using youtubei.js and youtube-sr for discord-player v6",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zijipia/ZiExtractor.git"
+  },
+  "author": "ziji",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zijipia/ZiExtractor/issues"
+  },
+  "homepage": "https://github.com/zijipia/ZiExtractor#readme",
+  "dependencies": {
+    "youtube-sr": "^4.3.11",
+    "youtubei.js": "^10.2.0"
+  }
+}
