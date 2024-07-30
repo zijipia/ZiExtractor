@@ -72,6 +72,7 @@ class ZiExtractor extends BaseExtractor {
 
     async deactivate() {
         this.protocols = [];
+        ZiExtractor.instance = null;
     }
 
     async validate(query, type) {
