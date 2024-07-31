@@ -19,7 +19,7 @@ async function searchYouTube(query, options = {}) {
 async function getYouTubeStream(query, innerTube) {
     try {
         const videoId = new URL(query.url).searchParams.get("v") || query.url.split("/").pop().split("?")[0];
-        const videoInfo = await innerTube.getBasicInfo(videoId, "ANDROID");
+        const videoInfo = await innerTube.getBasicInfo(videoId, "WEB");
 
         if (videoInfo.basic_info.is_live && videoInfo.basic_info.is_family_safe) {
             return videoInfo.streaming_data?.hls_manifest_url;
