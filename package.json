@@ -22,6 +22,6 @@
   },
   "dependencies": {
     "youtube-sr": "^4.3.11",
-    "youtubei.js": "^10.2.0"
+    "youtubei.js": "^10.3.0"
   }
 }
