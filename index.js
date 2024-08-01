@@ -24,11 +24,8 @@ async function getYouTubeStream(query, innerTube) {
         if (videoInfo.basic_info.is_live && videoInfo.basic_info.is_family_safe) {
             return videoInfo.streaming_data?.hls_manifest_url;
         }
-        const streamdata = videoInfo.streaming_data?.formats?.at(0)?.url;
-        if (streamdata) return streamdata;
-        return null;
-        // const downloadStream = await videoInfo.download({ quality: "best", format: "mp4", type: "audio" });
-        // return Readable.fromWeb(downloadStream);
+        const downloadStream = await videoInfo.download({ quality: "best", format: "mp4", type: "audio" });
+        return Readable.fromWeb(downloadStream);
     } catch (error) {
         console.error(`Error in getYouTubeStream: ${error.message}`);
         return null;
@@ -67,7 +64,7 @@ class ZiExtractor extends BaseExtractor {
 
     async activate() {
         this.protocols = ["ytsearch", "youtube"];
-        this.innerTube = await youtubei.default.create({ retrieve_player: false });
+        this.innerTube = await youtubei.default.create();
         this._stream = this.options.createStream || ((query) => getYouTubeStream(query, this.innerTube));
         ZiExtractor.instance = this;
     }
