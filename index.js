@@ -65,7 +65,7 @@ class ZiExtractor extends BaseExtractor {
 
     async activate() {
         this.protocols = ["ytsearch", "youtube"];
-        this.innerTube = await youtubei.default.create();
+        this.innerTube = await youtubei.default.create({ retrieve_player: false });
         this._stream = this.options.createStream || ((query) => getYouTubeStream(query, this.innerTube));
         ZiExtractor.instance = this;
     }
