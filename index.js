@@ -24,9 +24,11 @@ async function getYouTubeStream(query, innerTube) {
         if (videoInfo.basic_info.is_live && videoInfo.basic_info.is_family_safe) {
             return videoInfo.streaming_data?.hls_manifest_url;
         }
-
-        const downloadStream = await videoInfo.download({ quality: "best", format: "mp4", type: "audio" });
-        return Readable.fromWeb(downloadStream);
+        const streamdata = videoInfo.streaming_data?.formats?.at(0)?.url;
+        if (streamdata) return streamdata;
+        return null;
+        // const downloadStream = await videoInfo.download({ quality: "best", format: "mp4", type: "audio" });
+        // return Readable.fromWeb(downloadStream);
     } catch (error) {
         console.error(`Error in getYouTubeStream: ${error.message}`);
         return null;
