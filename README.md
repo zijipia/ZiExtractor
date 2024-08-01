@@ -5,7 +5,7 @@ ZiExtractor draws inspiration from the [discord-player-youtubei](https://github.
 ## Getting Started
 ### Installation ZiExtractor
 ```bash
-npm i https://github.com/zijipia/ZiExtractor
+npm i github:zijipia/ZiExtractor
 ```
 ### Integration
 1. Locate the main file where you initialize your discord-player (e.g., index.js).
