@@ -17,11 +17,10 @@
   },
   "homepage": "https://github.com/zijipia/ZiExtractor#readme",
   "devDependencies": {
-    "discord-player": "^6.7.0",
+    "discord-player": "^6.7.1",
     "discord.js": "^14.15.3"
   },
   "dependencies": {
-    "youtube-sr": "^4.3.11",
-    "youtubei.js": "^10.3.0"
+    "youtube-sr": "^4.3.11"
   }
 }

@@ -1,7 +1,5 @@
-const youtubei = require("youtubei.js");
 const { BaseExtractor, QueryType, Track, Playlist, Util } = require("discord-player");
 const YouTubeSR = require("youtube-sr");
-const { Readable } = require("stream");
 
 async function searchYouTube(query, options = {}) {
     try {
@@ -16,48 +14,24 @@ async function searchYouTube(query, options = {}) {
     }
 }
 
-async function getYouTubeStream(query, innerTube) {
+async function getStream(query, _) {
     try {
-        const videoId = new URL(query.url).searchParams.get("v") || query.url.split("/").pop().split("?")[0];
-        const videoInfo = await innerTube.getBasicInfo(videoId, "WEB");
-
-        if (videoInfo.basic_info.is_live && videoInfo.basic_info.is_family_safe) {
-            return videoInfo.streaming_data?.hls_manifest_url;
-        }
-        if (videoInfo?.streaming_data?.hls_manifest_url) return videoInfo.streaming_data?.hls_manifest_url;
-        const downloadStream = await videoInfo.download({ quality: "best", format: "mp4", type: "audio" });
-        return Readable.fromWeb(downloadStream);
+        const resp = await fetch("https://api.cobalt.tools/api/json", {
+            "headers": {
+                "accept": "application/json",
+                "content-type": "application/json",
+            },
+            "body": JSON.stringify({ url: query.url, isAudioOnly: true }),
+            "method": "POST",
+        });
+        const data = await resp.json();
+        return data.url;
     } catch (error) {
-        console.error(`Error in getYouTubeStream: ${error.message}`);
+        console.error(`Error in getStream: ${error.message}`);
         return null;
     }
 }
 
-function isValidYouTubeURL(link) {
-    const videoIdPattern = /^[a-zA-Z0-9-_]{11}$/;
-    const validYouTubeDomains = /^(?:https?:\/\/)?(?:www\.)?(youtube\.com|youtu\.be)/;
-
-    function validateVideoId(id) {
-        return videoIdPattern.test(id.trim());
-    }
-
-    function extractVideoId(link) {
-        const parsedURL = new URL(link.trim());
-        let videoId = parsedURL.searchParams.get("v") || (parsedURL.host === "youtu.be" ? parsedURL.pathname.split("/")[1] : parsedURL.pathname.split("/")[2]);
-
-        if (!validYouTubeDomains.test(link.trim()) || !videoId) throw Error(`Invalid YouTube URL: "${link}"`);
-        if (!validateVideoId(videoId)) throw TypeError(`Invalid video id: ${videoId}`);
-
-        return videoId;
-    }
-
-    try {
-        extractVideoId(link);
-        return true;
-    } catch {
-        return false;
-    }
-}
 
 class ZiExtractor extends BaseExtractor {
     static identifier = "com.Ziji.discord-player.youtube-Zijiext";
@@ -65,8 +39,7 @@ class ZiExtractor extends BaseExtractor {
 
     async activate() {
         this.protocols = ["ytsearch", "youtube"];
-        this.innerTube = await youtubei.default.create();
-        this._stream = this.options.createStream || ((query) => getYouTubeStream(query, this.innerTube));
+        this._stream = this.options.createStream || ((query) => getStream(query, null));
         ZiExtractor.instance = this;
     }
 
@@ -77,25 +50,12 @@ class ZiExtractor extends BaseExtractor {
 
     async validate(query, type) {
         return typeof query === "string" && [
-            QueryType.YOUTUBE,
-            QueryType.YOUTUBE_PLAYLIST,
-            QueryType.YOUTUBE_SEARCH,
-            QueryType.YOUTUBE_VIDEO,
             QueryType.AUTO,
             QueryType.AUTO_SEARCH,
         ].includes(type);
     }
 
-    async bridge(track, ext) {
-        const query = ext?.createBridgeQuery(track) || `${track.author} - ${track.title} (official audio)`;
-        const youtubeTrack = await this.handle(query, { type: QueryType.YOUTUBE_SEARCH, requestedBy: track.requestedBy });
-
-        if (!youtubeTrack.tracks.length) return null;
-        return this.stream(youtubeTrack.tracks[0]);
-    }
-
     async handle(query, context) {
-        if (context.protocol === "ytsearch") context.type = QueryType.YOUTUBE_SEARCH;
         query = query.includes("youtube.com") ? query.replace(/(m(usic)?|gaming)\./, "") : query;
 
         if (!query.includes("list=RD") && isValidYouTubeURL(query)) context.type = QueryType.YOUTUBE_VIDEO;
@@ -227,51 +187,6 @@ class ZiExtractor extends BaseExtractor {
         return this._stream(info, this);
     }
 
-    async getRelatedTracks(track, history) {
-        try {
-            const videoId = new URL(track.url).searchParams.get("v") || track.url.split("/").pop().split("?")[0];
-            const videoInfo = await this.innerTube.getInfo(videoId);
-            const recommendedVideos = videoInfo.watch_next_feed.filter(
-                (video) => !history.tracks.some((x) => x.url === `https://youtube.com/watch?v=${video.id}`) && video.type === "CompactVideo"
-            );
-
-            if (!recommendedVideos) {
-                this.context.player.debug("Unable to fetch recommendations");
-                return this.emptyResponse();
-            }
-
-            const relatedTracks = recommendedVideos.map((video) => {
-                const duration = Util.buildTimeCode(Util.parseMS(video.duration.seconds * 1000));
-                const rawMetadata = { live: video.is_live, duration_ms: video.duration.seconds * 1000, duration };
-
-                return new Track(this.context.player, {
-                    title: video.title?.text ?? "UNKNOWN TITLE",
-                    thumbnail: video.best_thumbnail?.url ?? video.thumbnails[0]?.url,
-                    author: video.author?.name ?? "UNKNOWN AUTHOR",
-                    requestedBy: track.requestedBy,
-                    url: `https://youtube.com/watch?v=${video.id}`,
-                    views: parseInt((video.view_count?.text ?? "0").replace(/,/g, "")),
-                    duration,
-                    raw: rawMetadata,
-                    source: "youtube",
-                    queryType: "youtubeVideo",
-                    metadata: rawMetadata,
-                    async requestMetadata() {
-                        return this.raw;
-                    },
-                });
-            });
-
-            return { playlist: null, tracks: relatedTracks };
-        } catch (error) {
-            console.error(`Error in getRelatedTracks: ${error.message}`);
-            return this.emptyResponse();
-        }
-    }
-
-    emptyResponse() {
-        return { playlist: null, tracks: [] };
-    }
 }
 
 module.exports = { ZiExtractor };
