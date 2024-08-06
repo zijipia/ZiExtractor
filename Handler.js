@@ -1,5 +1,17 @@
-const { YouTubeSR, Playlist, Track } = require("discord-player");
-
+const { Playlist, Track } = require("discord-player");
+const YouTubeSR = require("youtube-sr");
+async function searchYouTube(query, options = {}) {
+    try {
+        return await YouTubeSR.YouTube.search(query, {
+            type: "video",
+            safeSearch: options.safeSearch,
+            requestOptions: options,
+        }) || [];
+    } catch (error) {
+        console.error(`Error in searchYouTube: ${error.message}`);
+        return [];
+    }
+}
 async function handlePlaylist(query, context, extractor) {
     try {
         const playlistData = await YouTubeSR.YouTube.getPlaylist(query, {
@@ -57,6 +69,7 @@ async function handlePlaylist(query, context, extractor) {
 }
 
 async function handleVideo(query, context, extractor) {
+
     try {
         const videoIdMatch = /[a-zA-Z0-9-_]{11}/.exec(query);
         if (!videoIdMatch) return extractor.emptyResponse();
@@ -75,7 +88,7 @@ async function handleVideo(query, context, extractor) {
             duration: video.durationFormatted,
             source: "youtube",
             raw: video,
-            queryType: context.type,
+            queryType: "youtubeVideo",
             metadata: video,
             async requestMetadata() {
                 return video;
@@ -90,7 +103,8 @@ async function handleVideo(query, context, extractor) {
     }
 }
 
-async function searchYouTube(query, context) {
+async function searchYouTube(query, context, extractor) {
+
     try {
         const results = await YouTubeSR.YouTube.search(query, {
             type: "video",
@@ -98,7 +112,7 @@ async function searchYouTube(query, context) {
             requestOptions: context.requestOptions,
         });
 
-        return results.map((video) => new Track(context.player, {
+        return results.map((video) => new Track(extractor.context.player, {
             title: video.title,
             description: video.description,
             author: video.channel?.name,
@@ -109,7 +123,7 @@ async function searchYouTube(query, context) {
             duration: video.durationFormatted,
             source: "youtube",
             raw: video,
-            queryType: context.type,
+            queryType: "youtubeVideo",
             metadata: video,
             async requestMetadata() {
                 return video;
@@ -121,4 +135,33 @@ async function searchYouTube(query, context) {
     }
 }
 
-module.exports = { handlePlaylist, handleVideo, searchYouTube };
+async function RelatedTracks(track, history, extractor) {
+    let info = void 0;
+    info = await YouTubeSR.YouTube.search(track?.author || track.title, { limit: 15, type: "video" }).then((x) => x).catch(Util.noop);
+    if (!info?.length) {
+        return [];
+    }
+    const unique = info.filter((t) => !history.tracks.some((x) => x.url === t.url));
+    const similar = (unique.length > 0 ? unique : info).map((video) => {
+        const t = new Track(extractor.context.player, {
+            title: video.title,
+            url: `https://www.youtube.com/watch?v=${video.id}`,
+            duration: video.durationFormatted || Util.buildTimeCode(Util.parseMS(video.duration * 1e3)),
+            description: video.title,
+            thumbnail: typeof video.thumbnail === "string" ? video.thumbnail : video.thumbnail.url,
+            views: video.views,
+            author: video.channel.name,
+            requestedBy: track.requestedBy,
+            source: "youtube",
+            queryType: "youtubeVideo",
+            metadata: video,
+            async requestMetadata() {
+                return video;
+            }
+        });
+        t.extractor = extractor;
+        return t;
+    });
+    return similar;
+}
+module.exports = { handlePlaylist, handleVideo, searchYouTube, RelatedTracks };

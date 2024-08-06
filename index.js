@@ -1,6 +1,7 @@
-const { BaseExtractor, QueryType, Track } = require("discord-player");
+const { BaseExtractor, QueryType, Track, Util } = require("discord-player");
+const { YouTubeExtractor } = require("@discord-player/extractor")
 const { getLinkPreview } = require("link-preview-js");
-const { searchYouTube, handlePlaylist, handleVideo } = require("./Handler");
+const { searchYouTube, handlePlaylist, handleVideo, RelatedTracks } = require("./Handler");
 
 async function getStream(query, _) {
     try {
@@ -64,11 +65,21 @@ class ZiExtractor extends BaseExtractor {
 
     async handle(query, context) {
         query = query.includes("youtube.com") ? query.replace(/(m(usic)?|gaming)\./, "") : query;
+        if (context.protocol === "https") query = `https:${query}`
+        if (!query.includes("list=RD") && YouTubeExtractor.validateURL(query))
+            context.type = QueryType.YOUTUBE_VIDEO;
+        if (query.includes("list=RD") && YouTubeExtractor.validateURL(query))
+            context.type = QueryType.YOUTUBE_PLAYLIST;
+
         if (context.type === QueryType.YOUTUBE_PLAYLIST) return handlePlaylist(query, context, this);
         if ([QueryType.YOUTUBE_VIDEO, QueryType.YOUTUBE].includes(context.type)) return handleVideo(query, context, this);
+        if (query.includes("youtube.com")) {
+            const tracks = await searchYouTube(query, context, this);
+            return { playlist: null, tracks };
+        }
         if ([QueryType.ARBITRARY].includes(context.type)) {
             try {
-                const data = await getLinkPreview(`https:${query}`, {
+                const data = await getLinkPreview(query, {
                     timeout: 1000,
                 });
                 const track = new Track(this.context.player, {
@@ -94,38 +105,16 @@ class ZiExtractor extends BaseExtractor {
                 return this.emptyResponse();
             }
         }
-        const tracks = await searchYouTube(query, context);
-        return { playlist: null, tracks };
+
+        return this.emptyResponse();
+
     }
 
     async getRelatedTracks(track, history) {
-        let info = void 0;
-        info = await YouTubeSR.YouTube.search(track?.author || track.title, { limit: 5, type: "video" }).then((x) => x).catch(Util.noop);
-        if (!info?.length) {
-            return this.createResponse();
-        }
-        const unique = info.filter((t) => !history.tracks.some((x) => x.url === t.url));
-        const similar = (unique.length > 0 ? unique : info).map((video) => {
-            const t = new Track(this.context.player, {
-                title: video.title,
-                url: `https://www.youtube.com/watch?v=${video.id}`,
-                duration: video.durationFormatted || Util.buildTimeCode(Util.parseMS(video.duration * 1e3)),
-                description: video.title,
-                thumbnail: typeof video.thumbnail === "string" ? video.thumbnail : video.thumbnail.url,
-                views: video.views,
-                author: video.channel.name,
-                requestedBy: track.requestedBy,
-                source: "youtube",
-                queryType: "youtubeVideo",
-                metadata: video,
-                async requestMetadata() {
-                    return video;
-                }
-            });
-            t.extractor = this;
-            return t;
-        });
-        return this.createResponse(null, similar);
+        const tracks = await RelatedTracks(track, history, this);
+        if (!tracks.length) return this.createResponse();
+        return this.createResponse(null, tracks);
+
     }
 
     stream(info) {
