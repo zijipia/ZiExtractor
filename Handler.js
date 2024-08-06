@@ -1,5 +1,7 @@
 const { Playlist, Track, Util } = require("discord-player");
 const YouTubeSR = require("youtube-sr");
+const { YouTubeExtractor } = require("@discord-player/extractor")
+
 async function searchYouTube(query, options = {}) {
     try {
         return await YouTubeSR.YouTube.search(query, {
@@ -137,7 +139,10 @@ async function searchYouTube(query, context, extractor) {
 
 async function RelatedTracks(track, history, extractor) {
     let info = void 0;
-    info = await YouTubeSR.YouTube.search(track?.author || track.title, { limit: 15, type: "video" }).then((x) => x).catch(Util.noop);
+    if (YouTubeExtractor.validateURL(track.url))
+        info = await YouTubeSR.YouTube.getVideo(track.url).then((x) => x.videos).catch(Util.noop);
+    if (!info)
+        info = await YouTubeSR.YouTube.search(track?.author || track.title, { limit: 15, type: "video" }).then((x) => x).catch(Util.noop);
     if (!info?.length) {
         return [];
     }
