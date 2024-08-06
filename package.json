@@ -21,6 +21,7 @@
     "discord.js": "^14.15.3"
   },
   "dependencies": {
+    "link-preview-js": "^3.0.5",
     "youtube-sr": "^4.3.11"
   }
 }

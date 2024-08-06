@@ -1,28 +1,16 @@
-const { BaseExtractor, QueryType, Track, Playlist, Util } = require("discord-player");
-const YouTubeSR = require("youtube-sr");
-
-async function searchYouTube(query, options = {}) {
-    try {
-        return await YouTubeSR.YouTube.search(query, {
-            type: "video",
-            safeSearch: options.safeSearch,
-            requestOptions: options,
-        }) || [];
-    } catch (error) {
-        console.error(`Error in searchYouTube: ${error.message}`);
-        return [];
-    }
-}
+const { BaseExtractor, QueryType, Track } = require("discord-player");
+const { getLinkPreview } = require("link-preview-js");
+const { searchYouTube, handlePlaylist, handleVideo } = require("./Handler");
 
 async function getStream(query, _) {
     try {
         const resp = await fetch("https://api.cobalt.tools/api/json", {
-            "headers": {
-                "accept": "application/json",
+            headers: {
+                accept: "application/json",
                 "content-type": "application/json",
             },
-            "body": JSON.stringify({ url: query.url, isAudioOnly: true }),
-            "method": "POST",
+            body: JSON.stringify({ url: query.url, isAudioOnly: true }),
+            method: "POST",
         });
         const data = await resp.json();
         return data.url;
@@ -32,13 +20,27 @@ async function getStream(query, _) {
     }
 }
 
-
 class ZiExtractor extends BaseExtractor {
     static identifier = "com.Ziji.discord-player.youtube-Zijiext";
     static instance;
 
     async activate() {
-        this.protocols = ["ytsearch", "youtube"];
+        this.protocols = [
+            "https",
+            "bilibili",
+            "dailymotion",
+            "facebook",
+            "instagram",
+            "pinterest",
+            "soundcloud",
+            "streamable",
+            "tiktok",
+            "tumblr",
+            "twitch",
+            "twitter",
+            "vimeo",
+            "youtube",
+        ];
         this._stream = this.options.createStream || ((query) => getStream(query, null));
         ZiExtractor.instance = this;
     }
@@ -52,141 +54,87 @@ class ZiExtractor extends BaseExtractor {
         return typeof query === "string" && [
             QueryType.AUTO,
             QueryType.AUTO_SEARCH,
+            QueryType.YOUTUBE,
+            QueryType.YOUTUBE_SEARCH,
+            QueryType.YOUTUBE_PLAYLIST,
+            QueryType.YOUTUBE_VIDEO,
+            QueryType.ARBITRARY,
         ].includes(type);
     }
 
     async handle(query, context) {
         query = query.includes("youtube.com") ? query.replace(/(m(usic)?|gaming)\./, "") : query;
+        if (context.type === QueryType.YOUTUBE_PLAYLIST) return handlePlaylist(query, context, this);
+        if ([QueryType.YOUTUBE_VIDEO, QueryType.YOUTUBE].includes(context.type)) return handleVideo(query, context, this);
+        if ([QueryType.ARBITRARY].includes(context.type)) {
+            try {
+                const data = await getLinkPreview(`https:${query}`, {
+                    timeout: 1000,
+                });
+                const track = new Track(this.context.player, {
+                    title: data?.title ?? query,
+                    author: data.title,
+                    description: query,
+                    url: data.url,
+                    requestedBy: context.requestedBy,
+                    thumbnail: data.images?.at(0) ?? data.favicons?.at(0) ?? "https://raw.githubusercontent.com/zijipia/zijipia/main/Assets/image.png",
+                    source: "ARBITRARY",
+                    raw: data,
+                    queryType: context.type,
+                    metadata: data,
+                    async requestMetadata() {
+                        return data;
+                    },
+                });
 
-        if (!query.includes("list=RD") && isValidYouTubeURL(query)) context.type = QueryType.YOUTUBE_VIDEO;
-
-        if (context.type === QueryType.YOUTUBE_PLAYLIST) return this.handlePlaylist(query, context);
-        if (context.type === QueryType.YOUTUBE_VIDEO) return this.handleVideo(query, context);
-
-        const tracks = await this._searchYouTube(query, context);
+                track.extractor = this;
+                return { playlist: null, tracks: [track] };
+            } catch (error) {
+                console.error(`Error in handleVideo: ${error.message}`);
+                return this.emptyResponse();
+            }
+        }
+        const tracks = await searchYouTube(query, context);
         return { playlist: null, tracks };
     }
 
-    async handlePlaylist(query, context) {
-        try {
-            const playlistData = await YouTubeSR.YouTube.getPlaylist(query, {
-                fetchAll: true,
-                limit: context.requestOptions?.limit,
-                requestOptions: context.requestOptions,
-            });
-
-            if (!playlistData) return this.emptyResponse();
-
-            const playlist = new Playlist(this.context.player, {
-                title: playlistData.title,
-                thumbnail: playlistData.thumbnail?.displayThumbnailURL("maxresdefault"),
-                description: playlistData.title || "",
-                type: "playlist",
-                source: "youtube",
-                author: {
-                    name: playlistData.channel.name,
-                    url: playlistData.channel.url,
-                },
-                tracks: [],
-                id: playlistData.id,
-                url: playlistData.url,
-                rawPlaylist: playlistData,
-            });
-
-            playlist.tracks = playlistData.videos.map((video) => {
-                const track = new Track(this.context.player, {
-                    title: video.title,
-                    description: video.description,
-                    author: video.channel?.name,
-                    url: video.url,
-                    requestedBy: context.requestedBy,
-                    thumbnail: video.thumbnail.url,
-                    views: video.views,
-                    duration: video.durationFormatted,
-                    raw: video,
-                    playlist,
-                    source: "youtube",
-                    queryType: "youtubeVideo",
-                    metadata: video,
-                    async requestMetadata() {
-                        return video;
-                    },
-                });
-                track.extractor = this;
-                return track;
-            });
-
-            return { playlist, tracks: playlist.tracks };
-        } catch (error) {
-            console.error(`Error in handlePlaylist: ${error.message}`);
-            return this.emptyResponse();
+    async getRelatedTracks(track, history) {
+        let info = void 0;
+        info = await YouTubeSR.YouTube.search(track?.author || track.title, { limit: 5, type: "video" }).then((x) => x).catch(Util.noop);
+        if (!info?.length) {
+            return this.createResponse();
         }
-    }
-
-    async handleVideo(query, context) {
-        try {
-            const videoIdMatch = /[a-zA-Z0-9-_]{11}/.exec(query);
-            if (!videoIdMatch) return this.emptyResponse();
-
-            const video = await YouTubeSR.YouTube.getVideo(`https://www.youtube.com/watch?v=${videoIdMatch[0]}`, context.requestOptions);
-            if (!video) return this.emptyResponse();
-
-            const track = new Track(this.context.player, {
+        const unique = info.filter((t) => !history.tracks.some((x) => x.url === t.url));
+        const similar = (unique.length > 0 ? unique : info).map((video) => {
+            const t = new Track(this.context.player, {
                 title: video.title,
-                description: video.description,
-                author: video.channel?.name,
-                url: video.url,
-                requestedBy: context.requestedBy,
-                thumbnail: video.thumbnail?.displayThumbnailURL("maxresdefault"),
+                url: `https://www.youtube.com/watch?v=${video.id}`,
+                duration: video.durationFormatted || Util.buildTimeCode(Util.parseMS(video.duration * 1e3)),
+                description: video.title,
+                thumbnail: typeof video.thumbnail === "string" ? video.thumbnail : video.thumbnail.url,
                 views: video.views,
-                duration: video.durationFormatted,
+                author: video.channel.name,
+                requestedBy: track.requestedBy,
                 source: "youtube",
-                raw: video,
-                queryType: context.type,
+                queryType: "youtubeVideo",
                 metadata: video,
                 async requestMetadata() {
                     return video;
-                },
+                }
             });
-
-            track.extractor = this;
-            return { playlist: null, tracks: [track] };
-        } catch (error) {
-            console.error(`Error in handleVideo: ${error.message}`);
-            return this.emptyResponse();
-        }
-    }
-
-    async _searchYouTube(query, context) {
-        try {
-            const results = await searchYouTube(query, context.requestOptions);
-            return results.map((video) => new Track(this.context.player, {
-                title: video.title,
-                description: video.description,
-                author: video.channel?.name,
-                url: video.url,
-                requestedBy: context.requestedBy,
-                thumbnail: video.thumbnail?.displayThumbnailURL("maxresdefault"),
-                views: video.views,
-                duration: video.durationFormatted,
-                source: "youtube",
-                raw: video,
-                queryType: context.type,
-                metadata: video,
-                async requestMetadata() {
-                    return video;
-                },
-            })) || [];
-        } catch (error) {
-            console.error(`Error in _searchYouTube: ${error.message}`);
-            return [];
-        }
+            t.extractor = this;
+            return t;
+        });
+        return this.createResponse(null, similar);
     }
 
     stream(info) {
         return this._stream(info, this);
     }
 
+    emptyResponse() {
+        return { playlist: null, tracks: [] };
+    }
 }
 
 module.exports = { ZiExtractor };
