@@ -1,11 +1,11 @@
 # ZiExtractor:
 ## About 
 ZiExtractor is a personal music extractor built for extracting audio from various sources. It's currently under development and might not be entirely stable. Please use it with caution.  
-ZiExtractor draws inspiration from the [discord-player-youtubei](https://github.com/retrouser955/discord-player-youtubei), providing a foundation for audio extraction.
+ZiExtractor draws inspiration from the [@discord-player/extractor](https://www.npmjs.com/package/@discord-player/extractor), providing a foundation for audio extraction.
 ## Getting Started
 ### Installation ZiExtractor
 ```bash
-npm i github:zijipia/ZiExtractor
+npm i ziextractor
 ```
 ### Integration
 1. Locate the main file where you initialize your discord-player (e.g., index.js).
