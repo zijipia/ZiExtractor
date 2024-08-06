@@ -1,4 +1,4 @@
-const { Playlist, Track } = require("discord-player");
+const { Playlist, Track, Util } = require("discord-player");
 const YouTubeSR = require("youtube-sr");
 async function searchYouTube(query, options = {}) {
     try {
