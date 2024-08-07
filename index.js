@@ -77,33 +77,31 @@ class ZiExtractor extends BaseExtractor {
             const tracks = await searchYouTube(query, context, this);
             return { playlist: null, tracks };
         }
-        if ([QueryType.ARBITRARY].includes(context.type)) {
-            try {
-                const data = await getLinkPreview(query, {
-                    timeout: 1000,
-                });
-                const track = new Track(this.context.player, {
-                    title: data?.title ?? query,
-                    author: data.title,
-                    description: query,
-                    url: data.url,
-                    requestedBy: context.requestedBy,
-                    thumbnail: data.images?.at(0) ?? data.favicons?.at(0) ?? "https://raw.githubusercontent.com/zijipia/zijipia/main/Assets/image.png",
-                    source: "ARBITRARY",
-                    raw: data,
-                    queryType: context.type,
-                    metadata: data,
-                    async requestMetadata() {
-                        return data;
-                    },
-                });
+        try {
+            const data = await getLinkPreview(query, {
+                timeout: 1000,
+            });
+            const track = new Track(this.context.player, {
+                title: data?.title ?? query,
+                author: data.title,
+                description: query,
+                url: data.url,
+                requestedBy: context.requestedBy,
+                thumbnail: data.images?.at(0) ?? data.favicons?.at(0) ?? "https://raw.githubusercontent.com/zijipia/zijipia/main/Assets/image.png",
+                source: "ZiExt",
+                raw: data,
+                queryType: context.type,
+                metadata: data,
+                async requestMetadata() {
+                    return data;
+                },
+            });
 
-                track.extractor = this;
-                return { playlist: null, tracks: [track] };
-            } catch (error) {
-                console.error(`Error in handleVideo: ${error.message}`);
-                return this.emptyResponse();
-            }
+            track.extractor = this;
+            return { playlist: null, tracks: [track] };
+        } catch (error) {
+            console.error(`Error in handleVideo: ${error.message}`);
+            return this.emptyResponse();
         }
 
         return this.emptyResponse();
