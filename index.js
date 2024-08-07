@@ -68,7 +68,7 @@ class ZiExtractor extends BaseExtractor {
         if (context.protocol === "https") query = `https:${query}`
         if (!query.includes("list=RD") && YouTubeExtractor.validateURL(query))
             context.type = QueryType.YOUTUBE_VIDEO;
-        if (query.includes("list=RD") && YouTubeExtractor.validateURL(query))
+        if (query.includes("list=") && YouTubeExtractor.validateURL(query))
             context.type = QueryType.YOUTUBE_PLAYLIST;
 
         if (context.type === QueryType.YOUTUBE_PLAYLIST) return handlePlaylist(query, context, this);
