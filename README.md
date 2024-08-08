@@ -17,7 +17,7 @@ const { ZiExtractor } = require("ziextractor");
 ```js
 player.extractors.register(ZiExtractor, {});
 ```
-4. disable youtube
+4. Disable youtube
 ```js
 player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
 ```
