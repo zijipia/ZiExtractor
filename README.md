@@ -24,8 +24,6 @@ player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
 ## Important Notes
 * Exercise caution while using ZiExtractor as it's still under development.
 * Ensure you have the necessary permissions to extract audio from the intended sources.
-* Respect copyright laws and terms of service when using this library.
-
 ## Recommendation: 
 * In my opinion it works with [discord-player-youtubei](https://github.com/retrouser955/discord-player-youtubei)
 * Use together with discord-player-youtubei to improve performance: [Ziji-bot-discord](https://github.com/zijipia/Ziji-bot-discord/blob/main/index.js#L19)
