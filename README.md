@@ -17,11 +17,32 @@ const { ZiExtractor } = require("ziextractor");
 ```js
 player.extractors.register(ZiExtractor, {});
 ```
-4. disable youtube
+4. Disable youtube
 ```js
 player.extractors.loadDefault((ext) => ext !== 'YouTubeExtractor');
 ```
 ## Important Notes
 * Exercise caution while using ZiExtractor as it's still under development.
 * Ensure you have the necessary permissions to extract audio from the intended sources.
-* Respect copyright laws and terms of service when using this library.
+## Recommendation: 
+* In my opinion it works with [discord-player-youtubei](https://github.com/retrouser955/discord-player-youtubei)
+* Use together with discord-player-youtubei to improve performance: [Ziji-bot-discord](https://github.com/zijipia/Ziji-bot-discord/blob/main/index.js#L19)
+* Debug log with 2 package:
+```
+Searching https://www.youtube.com/watch?v=JNUHJE**** (link youtube has been hidden)
+Search engine set to auto, fallback search engine set to autoSearch
+Protocol https detected in query
+Protocol https is supported by com.Ziji.discord-player.youtube-Zijiext extractor!
+Query type identified as autoSearch but might not be used due to the presence of protocol
+Executing metadata query using com.Ziji.discord-player.youtube-Zijiext extractor...
+[Lag Monitor] Event loop latency: 14.564699999988079ms
+Metadata query was successful!
+Adding data to cache...
+[AsyncQueue] Acquiring an entry...
+[AsyncQueue] Entry 1271442968347152407 was acquired successfully!
+[AsyncQueue] Waiting for the queue to resolve...
+[AsyncQueue] Entry 1271442968347152407 was resolved!
+Executing extractor com.retrouser955.discord-player.discord-player-youtubei...
+Extractor com.retrouser955.discord-player.discord-player-youtubei executed successfully!
+[AsyncQueue] Releasing an entry from the queue...
+```
