@@ -1,28 +1,35 @@
 const { Playlist, Track, Util } = require("discord-player");
 const YouTubeSR = require("youtube-sr");
-const { YouTubeExtractor } = require("@discord-player/extractor")
+const { YouTubeExtractor } = require("@discord-player/extractor");
 
 async function searchYouTube(query, options = {}) {
     try {
-        return await YouTubeSR.YouTube.search(query, {
+        const results = await YouTubeSR.YouTube.search(query, {
             type: "video",
             safeSearch: options.safeSearch,
             requestOptions: options,
-        }) || [];
+        });
+        if (!results || !results.length) {
+        }
+        return results || [];
     } catch (error) {
-        console.error(`Error in searchYouTube: ${error.message}`);
         return [];
     }
 }
+
 async function handlePlaylist(query, context, extractor) {
     try {
+        extractor.context.player.debug(`[ZiExtractor] Fetching playlist for query: "${query}"`);
         const playlistData = await YouTubeSR.YouTube.getPlaylist(query, {
             fetchAll: true,
             limit: context.requestOptions?.limit,
             requestOptions: context.requestOptions,
         });
 
-        if (!playlistData) return extractor.emptyResponse();
+        if (!playlistData) {
+            extractor.context.player.debug(`[ZiExtractor] No playlist data found for query: "${query}"`);
+            return extractor.emptyResponse();
+        }
 
         const playlist = new Playlist(extractor.context.player, {
             title: playlistData.title,
@@ -34,139 +41,111 @@ async function handlePlaylist(query, context, extractor) {
                 name: playlistData.channel.name,
                 url: playlistData.channel.url,
             },
-            tracks: [],
             id: playlistData.id,
             url: playlistData.url,
             rawPlaylist: playlistData,
         });
 
-        playlist.tracks = playlistData.videos.map((video) => {
-            const track = new Track(extractor.context.player, {
-                title: video.title,
-                description: video.description,
-                author: video.channel?.name,
-                url: video.url,
-                requestedBy: context.requestedBy,
-                thumbnail: video.thumbnail.url,
-                views: video.views,
-                duration: video.durationFormatted,
-                raw: video,
-                playlist,
-                source: "youtube",
-                queryType: "youtubeVideo",
-                metadata: video,
-                async requestMetadata() {
-                    return video;
-                },
-            });
-            track.extractor = extractor;
-            return track;
-        });
+        extractor.context.player.debug(`[ZiExtractor] Playlist "${playlist.title}" created with ${playlistData.videos.length} tracks.`);
+        playlist.tracks = playlistData.videos.map(video => createTrack(video, context, extractor, playlist));
 
         return { playlist, tracks: playlist.tracks };
     } catch (error) {
-        console.error(`Error in handlePlaylist: ${error.message}`);
+        extractor.context.player.debug(`[ZiExtractor] Error in handlePlaylist: ${error.message}`);
         return extractor.emptyResponse();
     }
 }
 
 async function handleVideo(query, context, extractor) {
-
     try {
-        const videoIdMatch = /[a-zA-Z0-9-_]{11}/.exec(query);
-        if (!videoIdMatch) return extractor.emptyResponse();
+        extractor.context.player.debug(`[ZiExtractor] Handling video for query: "${query}"`);
+        const videoId = query.match(/[a-zA-Z0-9-_]{11}/)?.[0];
+        if (!videoId) {
+            extractor.context.player.debug(`[ZiExtractor] Invalid video ID in query: "${query}"`);
+            return extractor.emptyResponse();
+        }
 
-        const video = await YouTubeSR.YouTube.getVideo(`https://www.youtube.com/watch?v=${videoIdMatch[0]}`, context.requestOptions);
-        if (!video) return extractor.emptyResponse();
+        const video = await YouTubeSR.YouTube.getVideo(`https://www.youtube.com/watch?v=${videoId}`, context.requestOptions);
+        if (!video) {
+            extractor.context.player.debug(`[ZiExtractor] No video found for ID: "${videoId}"`);
+            return extractor.emptyResponse();
+        }
 
-        const track = new Track(extractor.context.player, {
-            title: video.title,
-            description: video.description,
-            author: video.channel?.name,
-            url: video.url,
-            requestedBy: context.requestedBy,
-            thumbnail: video.thumbnail?.displayThumbnailURL("maxresdefault"),
-            views: video.views,
-            duration: video.durationFormatted,
-            source: "youtube",
-            raw: video,
-            queryType: "youtubeVideo",
-            metadata: video,
-            async requestMetadata() {
-                return video;
-            },
-        });
-
-        track.extractor = extractor;
+        const track = createTrack(video, context, extractor);
         return { playlist: null, tracks: [track] };
     } catch (error) {
-        console.error(`Error in handleVideo: ${error.message}`);
+        extractor.context.player.debug(`[ZiExtractor] Error in handleVideo: ${error.message}`);
         return extractor.emptyResponse();
     }
 }
 
-async function searchYouTube(query, context, extractor) {
-
-    try {
-        const results = await YouTubeSR.YouTube.search(query, {
-            type: "video",
-            safeSearch: context.requestOptions?.safeSearch,
-            requestOptions: context.requestOptions,
-        });
-
-        return results.map((video) => new Track(extractor.context.player, {
-            title: video.title,
-            description: video.description,
-            author: video.channel?.name,
-            url: video.url,
-            requestedBy: context.requestedBy,
-            thumbnail: video.thumbnail?.displayThumbnailURL("maxresdefault"),
-            views: video.views,
-            duration: video.durationFormatted,
-            source: "youtube",
-            raw: video,
-            queryType: "youtubeVideo",
-            metadata: video,
-            async requestMetadata() {
-                return video;
-            },
-        })) || [];
-    } catch (error) {
-        console.error(`Error in searchYouTube: ${error.message}`);
-        return [];
-    }
-}
-
 async function RelatedTracks(track, history, extractor) {
-    let info = void 0;
-    if (YouTubeExtractor.validateURL(track.url))
-        info = await YouTubeSR.YouTube.getVideo(track.url).then((x) => x.videos).catch(Util.noop);
-    if (!info)
-        info = await YouTubeSR.YouTube.search(track?.author || track.title, { limit: 15, type: "video" }).then((x) => x).catch(Util.noop);
-    if (!info?.length) {
+    try {
+        extractor.context.player.debug(`[ZiExtractor] Fetching related tracks for track: "${track.title}"`);
+        const relatedVideos = await fetchRelatedVideos(track, extractor);
+        if (!relatedVideos.length) {
+            extractor.context.player.debug(`[ZiExtractor] No related videos found for track: "${track.title}"`);
+            return [];
+        }
+
+        const uniqueTracks = filterUniqueTracks(relatedVideos, history);
+        extractor.context.player.debug(`[ZiExtractor] Found ${uniqueTracks.length} unique related tracks for track: "${track.title}"`);
+        return uniqueTracks.map(video => createTrack(video, { requestedBy: track.requestedBy }, extractor));
+    } catch (error) {
+        extractor.context.player.debug(`[ZiExtractor] Error in RelatedTracks: ${error.message}`);
         return [];
     }
-    const unique = info.filter((t) => !history.tracks.some((x) => x.url === t.url));
-    const similar = (unique.length > 0 ? unique : info).map((video) => {
-        const t = new Track(extractor.context.player, {
-            title: video.title,
-            url: `https://www.youtube.com/watch?v=${video.id}`,
-            duration: video.durationFormatted || Util.buildTimeCode(Util.parseMS(video.duration * 1e3)),
-            description: video.title,
-            thumbnail: typeof video.thumbnail === "string" ? video.thumbnail : video.thumbnail.url,
-            views: video.views,
-            author: video.channel.name,
-            requestedBy: track.requestedBy,
-            source: "youtube",
-            queryType: "youtubeVideo",
-            metadata: video,
-            async requestMetadata() {
-                return video;
-            }
-        });
-        t.extractor = extractor;
-        return t;
-    });
-    return similar;
 }
+
+function createTrack(video, context, extractor, playlist = null) {
+    extractor.context.player.debug(`[ZiExtractor] Video: "${video?.title.slice(0, 70)}..."`);
+    return new Track(extractor.context.player, {
+        title: video.title,
+        description: video.description,
+        author: video.channel?.name,
+        url: video.url,
+        requestedBy: context.requestedBy,
+        thumbnail: video.thumbnail?.displayThumbnailURL("maxresdefault") || video.thumbnail.url,
+        views: video.views,
+        duration: video?.durationFormatted || Util.buildTimeCode(Util.parseMS(video.duration * 1e3)),
+        source: "youtube",
+        raw: video,
+        queryType: "youtubeVideo",
+        metadata: video,
+        playlist,
+        async requestMetadata() {
+            return video;
+        },
+    });
+}
+
+async function fetchRelatedVideos(track, extractor) {
+    try {
+        if (YouTubeExtractor.validateURL(track.url)) {
+            extractor.context.player.debug(`[ZiExtractor] Fetching related videos for URL: "${track.url}"`);
+            return await YouTubeSR.YouTube.getVideo(track.url)
+                .then(video => video.videos)
+                .catch((error) => {
+                    extractor.context.player.debug(`[ZiExtractor] Error fetching related videos: ${error.message}`);
+                    return [];
+                });
+        } else {
+            extractor.context.player.debug(`[ZiExtractor] Searching related videos for author/title: "${track.author || track.title}"`);
+            return await YouTubeSR.YouTube.search(track.author || track.title, { limit: 25, type: "video" })
+                .then(results => results)
+                .catch((error) => {
+                    extractor.context.player.debug(`[ZiExtractor] Error searching related videos: ${error.message}`);
+                    return [];
+                });
+        }
+    } catch (error) {
+        extractor.context.player.debug(`[ZiExtractor] Error in fetchRelatedVideos: ${error.message}`);
+        return [];
+    }
+}
+
+function filterUniqueTracks(videos, history) {
+    return videos.filter(video => !history.tracks.some(track => track.url === video.url));
+}
+
 module.exports = { handlePlaylist, handleVideo, searchYouTube, RelatedTracks };
