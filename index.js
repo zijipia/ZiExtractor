@@ -69,9 +69,10 @@ class ZiExtractor extends BaseExtractor {
     async handle(query, context) {
         this.context.player.debug(`[ZiExtractor] Handling query: ${query}`);
         try {
+            // Prepend 'https:' for relative protocol URLs
             if (context.protocol === "https") query = `https:${query}`;
-
-            if (query.includes("youtube.com")) {
+            // YouTube specific handling
+            if (["youtube", "youtu.be"].includes(query) || YouTubeExtractor.validateURL(query)) {
                 query = query.replace(/(m(usic)?|gaming)\./, "");
 
                 if (context.type === QueryType.YOUTUBE_PLAYLIST || query.includes("list=")) {
@@ -88,9 +89,9 @@ class ZiExtractor extends BaseExtractor {
                 const tracks = await searchYouTube(query, context, this);
                 return { playlist: null, tracks };
             }
-
+            // Non-YouTube handling
             this.context.player.debug(`[ZiExtractor] Handling non-YouTube query: ${query}`);
-            const data = await getLinkPreview(query, { timeout: 1000 });
+            const data = await getLinkPreview(query, { timeout: 1500 });
             const track = this.createTrack(data, query, context);
 
             return { playlist: null, tracks: [track] };
