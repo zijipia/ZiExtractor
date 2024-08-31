@@ -118,7 +118,6 @@ class ZiExtractor extends BaseExtractor {
             open_graph,
             author,
             description,
-            canonical_url,
             oEmbed
         } = data ?? {};
 
@@ -128,7 +127,7 @@ class ZiExtractor extends BaseExtractor {
             title: getFirstValue(twitter_card?.title, title, open_graph?.title),
             author: getFirstValue(author, open_graph?.article?.author, oEmbed?.author_name),
             description: getFirstValue(description, open_graph?.description, twitter_card?.description),
-            url: getFirstValue(canonical_url, open_graph?.url, twitter_card?.url, query),
+            url: query,
             requestedBy: context.requestedBy,
             thumbnail: getFirstValue(
                 open_graph?.images?.[0]?.url,
