@@ -1,5 +1,5 @@
 const { BaseExtractor, QueryType, Track } = require("discord-player");
-const { getLinkPreview } = require("link-preview-js");
+const { unfurl } = require('unfurl.js');
 const { searchYouTube, handlePlaylist, handleVideo, RelatedTracks } = require("./Handler");
 const { YouTubeExtractor } = require("@discord-player/extractor");
 
@@ -27,22 +27,11 @@ class ZiExtractor extends BaseExtractor {
     static instance;
 
     async activate() {
-        this.protocols = [
-            "https",
-            "bilibili",
-            "dailymotion",
-            "facebook",
-            "instagram",
-            "pinterest",
-            "soundcloud",
-            "streamable",
-            "tiktok",
-            "tumblr",
-            "twitch",
-            "twitter",
-            "vimeo",
-            "youtube",
-        ];
+        this.protocols = new Set([
+            "https", "bilibili", "dailymotion", "facebook", "instagram",
+            "pinterest", "soundcloud", "streamable", "tiktok", "tumblr",
+            "twitch", "twitter", "vimeo", "youtube"
+        ]);
         this._stream = this.options.createStream || getStream;
         ZiExtractor.instance = this;
     }
@@ -91,7 +80,8 @@ class ZiExtractor extends BaseExtractor {
             }
             // Non-YouTube handling
             this.context.player.debug(`[ZiExtractor] Handling non-YouTube query: ${query}`);
-            const data = await getLinkPreview(query, { timeout: 1500 });
+
+            const data = await unfurl(query, { timeout: 1500 });
             const track = this.createTrack(data, query, context);
 
             return { playlist: null, tracks: [track] };
@@ -104,14 +94,31 @@ class ZiExtractor extends BaseExtractor {
 
     createTrack(data, query, context) {
         this.context.player.debug(`[ZiExtractor] Creating track for query: ${query}`);
+        const {
+            twitter_card,
+            title,
+            open_graph,
+            author,
+            description,
+            canonical_url,
+            oEmbed
+        } = data ?? {};
+
+        const getFirstValue = (...args) => args.find(arg => arg !== undefined && arg !== null) ?? "Unknown";
+
         return new Track(this.context.player, {
-            title: data?.title || query,
-            author: data?.title || "Unknown",
-            description: query,
-            url: data.url,
+            title: getFirstValue(twitter_card?.title, title, open_graph?.title),
+            author: getFirstValue(author, open_graph?.article?.author, oEmbed?.author_name),
+            description: getFirstValue(description, open_graph?.description, twitter_card?.description),
+            url: getFirstValue(canonical_url, open_graph?.url, twitter_card?.url, query),
             requestedBy: context.requestedBy,
-            thumbnail: data.images?.[0] || data.favicons?.[0] || "https://raw.githubusercontent.com/zijipia/zijipia/main/Assets/image.png",
-            source: "ZiExt",
+            thumbnail: getFirstValue(
+                open_graph?.images?.[0]?.url,
+                oEmbed?.thumbnails?.[0]?.url,
+                twitter_card?.images?.[0]?.url,
+                "https://raw.githubusercontent.com/zijipia/zijipia/main/Assets/image.png"
+            ),
+            source: getFirstValue(open_graph?.site_name, oEmbed?.provider_name, twitter_card?.site, "ZiExt"),
             raw: data,
             queryType: context.type,
             metadata: data,
