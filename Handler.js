@@ -121,23 +121,20 @@ function createTrack(video, context, extractor, playlist = null) {
 
 async function fetchRelatedVideos(track, extractor) {
     try {
+        const { player } = extractor.context;
+        let result = [];
+
         if (YouTubeExtractor.validateURL(track.url)) {
-            extractor.context.player.debug(`[ZiExtractor] Fetching related videos for URL: "${track.url}"`);
-            return await YouTubeSR.YouTube.getVideo(track.url)
-                .then(video => video.videos)
-                .catch((error) => {
-                    extractor.context.player.debug(`[ZiExtractor] Error fetching related videos: ${error.message}`);
-                    return [];
-                });
+            player.debug(`[ZiExtractor] Fetching related videos for URL: "${track.url}"`);
+            const video = await YouTubeSR.YouTube.getVideo(track.url);
+            result = video?.videos || [];
         } else {
-            extractor.context.player.debug(`[ZiExtractor] Searching related videos for author/title: "${track.author || track.title}"`);
-            return await YouTubeSR.YouTube.search(track.author || track.title, { limit: 25, type: "video" })
-                .then(results => results)
-                .catch((error) => {
-                    extractor.context.player.debug(`[ZiExtractor] Error searching related videos: ${error.message}`);
-                    return [];
-                });
+            const searchQuery = (track.author && track.author !== "Unknown") ? track.author : track.title;
+            player.debug(`[ZiExtractor] Searching related videos for: "${searchQuery}"`);
+            result = await YouTubeSR.YouTube.search(searchQuery, { limit: 25, type: "video" });
         }
+
+        return result;
     } catch (error) {
         extractor.context.player.debug(`[ZiExtractor] Error in fetchRelatedVideos: ${error.message}`);
         return [];

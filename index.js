@@ -28,9 +28,27 @@ class ZiExtractor extends BaseExtractor {
 
     async activate() {
         this.protocols = [
-            "https", "bilibili", "dailymotion", "facebook", "instagram",
-            "pinterest", "soundcloud", "streamable", "tiktok", "tumblr",
-            "twitch", "twitter", "vimeo", "youtube"
+            "https",
+            "bilibili",
+            "dailymotion",
+            "facebook",
+            "instagram",
+            "loom",
+            "ok",
+            "pinterest",
+            "reddit",
+            "rutube",
+            "snapchat",
+            "soundcloud",
+            "streamable",
+            "tiktok",
+            "tumblr",
+            "twitch",
+            "twitter",
+            "vine",
+            "vimeo",
+            "vk",
+            "youtube"
         ];
         this._stream = this.options.createStream || getStream;
         ZiExtractor.instance = this;
