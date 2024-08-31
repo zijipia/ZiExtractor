@@ -10,7 +10,7 @@ type StreamFN = (info: Track) => Promise<Readable | string>;
 declare class ZiExtractor extends BaseExtractor<YoutubeExtractorInit> {
     static identifier: "com.Ziji.discord-player.youtube-Zijiext";
     static instance: ZiExtractor | null;
-    protocols: Set<string>;
+    protocols: Array<string>;
     _stream: StreamFN;
 
     activate(): Promise<void>;
