@@ -6,29 +6,41 @@ import {
   ExtractorInfo,
   ExtractorSearchContext,
   ExtractorStreamable,
+  QueryType,
+  Playlist
 } from 'discord-player';
 import { Readable } from 'stream';
 
-interface YoutubeExtractorInit {
-  createStream?: (ext: BaseExtractor<object>, url: string) => Promise<Readable | string>;
+interface ZiExtractorInit {
+  createStream?: (info: Track) => Promise<Readable | string>;
 }
 
-type StreamFN = (info: Track) => Promise<Readable | string>;
-
-declare class ZiExtractor extends BaseExtractor<YoutubeExtractorInit> {
-  static identifier: 'com.Ziji.discord-player.youtube-Zijiext';
+declare class ZiExtractor extends BaseExtractor<ZiExtractorInit> {
+  static identifier: string;
   static instance: ZiExtractor | null;
-  protocols: Array<string>;
-  _stream: StreamFN;
+  protocols: string[];
+  private _stream: (info: Track) => Promise<Readable | string>;
+
+  constructor(options: ZiExtractorInit);
 
   activate(): Promise<void>;
   deactivate(): Promise<void>;
   validate(query: string, type?: SearchQueryType | null | undefined): boolean;
   handle(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
-  createTrack(data: any, query: string, context: ExtractorSearchContext): Track;
+  isYouTubeQuery(query: string): boolean;
+  handleYouTubeQuery(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
+  handleNonYouTubeQuery(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
+  fallbackToYouTubeSearch(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
+  searchYouTube(query: string, options?: any): Promise<any[]>;
+  handlePlaylist(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
+  handleVideo(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
   getRelatedTracks(track: Track, history: GuildQueueHistory): Promise<ExtractorInfo>;
   stream(info: Track): Promise<ExtractorStreamable>;
   emptyResponse(): ExtractorInfo;
+  createTrack(data: any, query: string, context: ExtractorSearchContext): Track;
+  fetchRelatedVideos(track: Track, history: GuildQueueHistory): Promise<any[]>;
+  filterUniqueTracks(videos: any[], history: GuildQueueHistory): any[];
+  private log(message: string): void;
 }
 
 export { ZiExtractor };

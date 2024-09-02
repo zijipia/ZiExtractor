@@ -1,7 +1,7 @@
 {
   "name": "ziextractor",
-  "version": "1.0.8",
-  "description": "Extractor using youtubei.js and youtube-sr for discord-player v6",
+  "version": "1.0.9",
+  "description": "Extractor using cobalt tools and youtube-sr for discord-player v6",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

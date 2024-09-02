@@ -1,7 +1,6 @@
-const { BaseExtractor, QueryType, Track } = require('discord-player');
+const { BaseExtractor, QueryType, Track, Playlist } = require('discord-player');
 const { unfurl } = require('unfurl.js');
-const { searchYouTube, handlePlaylist, handleVideo, RelatedTracks } = require('./Handler');
-const { YouTubeExtractor } = require('@discord-player/extractor');
+const YouTubeSR = require('youtube-sr');
 
 async function getStream(query) {
   try {
@@ -21,47 +20,70 @@ async function getStream(query) {
     return null;
   }
 }
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+function isYouTubeQuery(query) {
+  if (['youtube', 'youtu.be'].some(domain => query.includes(domain))) {
+    return true;
+  }
 
+  if (/^[a-zA-Z0-9_-]{11}$/.test(query)) {
+    return true;
+  }
+
+  return query.length > 0;
+}
 class ZiExtractor extends BaseExtractor {
   static identifier = 'com.Ziji.discord-player.youtube-Zijiext';
   static instance;
 
+  protocols = [
+    'https',
+    'bilibili',
+    'dailymotion',
+    'facebook',
+    'instagram',
+    'loom',
+    'ok',
+    'pinterest',
+    'reddit',
+    'rutube',
+    'snapchat',
+    'soundcloud',
+    'streamable',
+    'tiktok',
+    'tumblr',
+    'twitch',
+    'twitter',
+    'vine',
+    'vimeo',
+    'vk',
+    'youtube',
+  ];
+
+  constructor(options) {
+    super(options);
+    this._stream = options.createStream || getStream;
+  }
+
   async activate() {
-    this.protocols = [
-      'https',
-      'bilibili',
-      'dailymotion',
-      'facebook',
-      'instagram',
-      'loom',
-      'ok',
-      'pinterest',
-      'reddit',
-      'rutube',
-      'snapchat',
-      'soundcloud',
-      'streamable',
-      'tiktok',
-      'tumblr',
-      'twitch',
-      'twitter',
-      'vine',
-      'vimeo',
-      'vk',
-      'youtube',
-    ];
-    this._stream = this.options.createStream || getStream;
     ZiExtractor.instance = this;
   }
 
   async deactivate() {
-    this.context.player.debug('[ZiExtractor] Deactivating ZiExtractor');
+    this.log('Deactivating ZiExtractor');
     this.protocols = [];
     ZiExtractor.instance = null;
   }
 
   validate(query, type) {
-    this.context.player.debug(`[ZiExtractor] Validating query: ${query} with type: ${type}`);
+    this.log(`Validating query: ${query} with type: ${type}`);
     return (
       typeof query === 'string' &&
       [
@@ -77,57 +99,163 @@ class ZiExtractor extends BaseExtractor {
   }
 
   async handle(query, context) {
-    this.context.player.debug(`[ZiExtractor] Handling query: ${query}`);
+    this.log(`Handling query: ${query}`);
     try {
-      // Prepend 'https:' for relative protocol URLs
       if (context.protocol === 'https') query = `https:${query}`;
-      // YouTube specific handling
-      if (['youtube', 'youtu.be'].includes(query) || YouTubeExtractor.validateURL(query)) {
+
+      if (isYouTubeQuery(query)) {
         query = query.replace(/(m(usic)?|gaming)\./, '');
-
-        if (context.type === QueryType.YOUTUBE_PLAYLIST || query.includes('list=')) {
-          this.context.player.debug(`[ZiExtractor] Handling YouTube playlist: ${query}`);
-          return handlePlaylist(query, context, this);
-        }
-
-        if (
-          [QueryType.YOUTUBE_VIDEO, QueryType.YOUTUBE].includes(context.type) ||
-          YouTubeExtractor.validateURL(query)
-        ) {
-          this.context.player.debug(`[ZiExtractor] Handling YouTube video: ${query}`);
-          return handleVideo(query, context, this);
-        }
-
-        this.context.player.debug(`[ZiExtractor] Searching YouTube for query: ${query}`);
-        const tracks = await searchYouTube(query, context, this);
-        return { playlist: null, tracks };
+        return await this.handleYouTubeQuery(query, context);
       }
-      // Non-YouTube handling
-      this.context.player.debug(`[ZiExtractor] Handling non-YouTube query: ${query}`);
 
-      const data = await unfurl(query, { timeout: 1500 });
-      const track = this.createTrack(data, query, context);
+      if (isValidUrl(query)) {
+        return await this.handleNonYouTubeQuery(query, context);
+      }
 
-      return { playlist: null, tracks: [track] };
+      return await this.fallbackToYouTubeSearch(query, context);
     } catch (error) {
-      this.context.player.debug(`[ZiExtractor] Error in handle: ${error.message}`);
-      console.error(`Error in handle: ${error.message}`);
+      this.log(`Error handling query: ${error.message}`);
+      return await this.fallbackToYouTubeSearch(query, context);
+    }
+  }
+
+  async handleYouTubeQuery(query, context) {
+    if (context.type === QueryType.YOUTUBE_PLAYLIST || query.includes('list=')) {
+      this.log(`Handling YouTube playlist: ${query}`);
+      return this.handlePlaylist(query, context);
+    }
+
+    if (
+      [QueryType.YOUTUBE_VIDEO, QueryType.YOUTUBE_SEARCH].includes(context.type) ||
+      YouTubeSR.YouTube.validate(query, 'VIDEO')
+    ) {
+      this.log(`Handling YouTube video: ${query}`);
+      return this.handleVideo(query, context);
+    }
+
+    return await this.fallbackToYouTubeSearch(query, context);
+  }
+
+  async handleNonYouTubeQuery(query, context) {
+    this.log(`Handling non-YouTube query: ${query}`);
+    const data = await unfurl(query, { timeout: 1500 });
+    const track = this.createTrack(data, query, context);
+    return { playlist: null, tracks: [track] };
+  }
+
+  async fallbackToYouTubeSearch(query, context) {
+    this.log(`Falling back to YouTube search for query: ${query}`);
+    const tracks = await this.searchYouTube(query, context);
+    return tracks.length ? { playlist: null, tracks } : this.emptyResponse();
+  }
+
+  async searchYouTube(query, options = {}) {
+    try {
+      const results = await YouTubeSR.YouTube.search(query, {
+        type: 'video',
+        safeSearch: options.safeSearch,
+        requestOptions: options,
+      });
+      return results || [];
+    } catch (error) {
+      this.log(`Error in searchYouTube: ${error.message}`);
+      return [];
+    }
+  }
+
+  async handlePlaylist(query, context) {
+    this.log(`Fetching playlist for query: "${query}"`);
+    try {
+      const playlistData = await YouTubeSR.YouTube.getPlaylist(query, {
+        fetchAll: true,
+        limit: context.requestOptions?.limit,
+        requestOptions: context.requestOptions,
+      });
+
+      if (!playlistData) {
+        this.log(`No playlist data found for query: "${query}"`);
+        return this.handleVideo(query, context);
+      }
+
+      const playlist = new Playlist(this.context.player, {
+        title: playlistData.title,
+        thumbnail: playlistData.thumbnail?.displayThumbnailURL('maxresdefault'),
+        description: playlistData.title || '',
+        type: 'playlist',
+        source: 'youtube',
+        author: {
+          name: playlistData.channel.name,
+          url: playlistData.channel.url,
+        },
+        id: playlistData.id,
+        url: playlistData.url,
+        rawPlaylist: playlistData,
+      });
+
+      this.log(`Playlist "${playlist.title}" created with ${playlistData.videos.length} tracks.`);
+      playlist.tracks = playlistData.videos.map(video => this.createYTTrack(video, context, playlist));
+
+      return { playlist, tracks: playlist.tracks };
+    } catch (error) {
+      this.log(`Error in handlePlaylist: ${error.message}`);
       return this.emptyResponse();
     }
   }
 
+  async handleVideo(query, context) {
+    this.log(`Handling video for query: "${query}"`);
+    try {
+      const videoId = query.match(/[a-zA-Z0-9-_]{11}/)?.[0];
+      if (!videoId) {
+        this.log(`Invalid video ID in query: "${query}"`);
+        return this.emptyResponse();
+      }
+
+      const video = await YouTubeSR.YouTube.getVideo(
+        `https://www.youtube.com/watch?v=${videoId}`,
+        context.requestOptions
+      );
+      if (!video) {
+        this.log(`No video found for ID: "${videoId}"`);
+        return this.emptyResponse();
+      }
+
+      const track = this.createYTTrack(video, context);
+      return { playlist: null, tracks: [track] };
+    } catch (error) {
+      this.log(`Error in handleVideo: ${error.message}`);
+      return this.emptyResponse();
+    }
+  }
+
+  async getRelatedTracks(track, history) {
+    this.log(`Fetching related tracks for: ${track.url}`);
+    const tracks = await this.fetchRelatedVideos(track, history);
+    return tracks.length ? { playlist: null, tracks } : this.emptyResponse();
+  }
+
+  stream(info) {
+    this.log(`Streaming info for: ${info.url}`);
+    return this._stream(info);
+  }
+
+  emptyResponse() {
+    this.log('Returning empty response');
+    return { playlist: null, tracks: [] };
+  }
+
   createTrack(data, query, context) {
-    this.context.player.debug(`[ZiExtractor] Creating track for query: ${query}`);
+    this.log(`Creating track for query: ${query}`);
     const { twitter_card, title, open_graph, author, description, oEmbed } = data ?? {};
 
-    const getFirstValue = (...args) => args.find(arg => arg !== undefined && arg !== null) ?? 'Unknown';
+    const getFirstValue = (...args) => args.find(arg => arg != null) ?? 'Unknown';
 
     return new Track(this.context.player, {
       title: getFirstValue(twitter_card?.title, title, open_graph?.title),
       author: getFirstValue(author, open_graph?.article?.author, oEmbed?.author_name),
       description: getFirstValue(description, open_graph?.description, twitter_card?.description),
       url: query,
-      requestedBy: context.requestedBy,
+      requestedBy: context?.requestedBy,
       thumbnail: getFirstValue(
         open_graph?.images?.[0]?.url,
         oEmbed?.thumbnails?.[0]?.url,
@@ -144,20 +272,53 @@ class ZiExtractor extends BaseExtractor {
     });
   }
 
-  async getRelatedTracks(track, history) {
-    this.context.player.debug(`[ZiExtractor] Fetching related tracks for: ${track.url}`);
-    const tracks = await RelatedTracks(track, history, this);
-    return tracks.length ? this.createResponse(null, tracks) : this.emptyResponse();
+  createYTTrack(video, context, playlist = null) {
+    this.log(`Video: "${video?.title.slice(0, 70)}..."`);
+    return new Track(this.context.player, {
+      title: video.title,
+      description: video?.description,
+      author: video.channel?.name,
+      url: video.url,
+      requestedBy: context?.requestedBy,
+      thumbnail: video.thumbnail?.displayThumbnailURL('maxresdefault') || video.thumbnail.url,
+      views: video.views,
+      duration: video?.durationFormatted || Util.buildTimeCode(Util.parseMS(video.duration * 1e3)),
+      source: 'youtube',
+      raw: video,
+      queryType: 'youtubeVideo',
+      metadata: video,
+      playlist,
+      async requestMetadata() {
+        return video;
+      },
+    });
   }
 
-  stream(info) {
-    this.context.player.debug(`[ZiExtractor] Streaming info for: ${info.url}`);
-    return this._stream(info);
+  async fetchRelatedVideos(track, history) {
+    try {
+      let result = [];
+      if (YouTubeSR.YouTube.validate(track.url, 'VIDEO')) {
+        this.log(`Fetching related videos for URL: "${track.url}"`);
+        const video = await YouTubeSR.YouTube.getVideo(track.url);
+        result = video?.videos || [];
+      } else {
+        const searchQuery = track.author && track.author !== 'Unknown' ? track.author : track.title;
+        this.log(`Searching related videos for: "${searchQuery}"`);
+        result = await YouTubeSR.YouTube.search(searchQuery, { limit: 25, type: 'video' });
+      }
+      return this.filterUniqueTracks(result, history);
+    } catch (error) {
+      this.log(`Error in fetchRelatedVideos: ${error.message}`);
+      return [];
+    }
   }
 
-  emptyResponse() {
-    this.context.player.debug('[ZiExtractor] Returning empty response');
-    return { playlist: null, tracks: [] };
+  filterUniqueTracks(videos, history) {
+    return videos.filter(video => !history.tracks.some(track => track.url === video.url));
+  }
+
+  log(message) {
+    this.context.player.debug(`[ZiExtractor] ${message}`);
   }
 }
 
