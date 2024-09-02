@@ -40,7 +40,7 @@ function isYouTubeQuery(query) {
   return query.length > 0;
 }
 class ZiExtractor extends BaseExtractor {
-  static identifier = 'com.Ziji.discord-player.youtube-Zijiext';
+  static identifier = 'com.Ziji.discord-player.Zijiext';
   static instance;
 
   protocols = [
@@ -230,8 +230,26 @@ class ZiExtractor extends BaseExtractor {
 
   async getRelatedTracks(track, history) {
     this.log(`Fetching related tracks for: ${track.url}`);
-    const tracks = await this.fetchRelatedVideos(track, history);
-    return tracks.length ? { playlist: null, tracks } : this.emptyResponse();
+    try {
+      let result = [];
+      if (YouTubeSR.YouTube.validate(track.url, 'VIDEO')) {
+        this.log(`Fetching related videos for URL: "${track.url}"`);
+        const video = await YouTubeSR.YouTube.getVideo(track.url);
+        result = video?.videos || [];
+      } else {
+        const searchQuery = track.author && track.author !== 'Unknown' ? track.author : track.title;
+        this.log(`Searching related videos for: "${searchQuery}"`);
+        result = await YouTubeSR.YouTube.search(searchQuery, { limit: 25, type: 'video' });
+      }
+      const uniqueTracks = result.filter(video => !history.tracks.some(track => track.url === video.url));
+      this.log(`Found ${uniqueTracks.length} unique related tracks for track: "${track?.title}"`);
+
+      const tracks = uniqueTracks.map(video => this.createYTTrack(video, { requestedBy: track.requestedBy }));
+      return { playlist: null, tracks };
+    } catch (error) {
+      this.log(`Error in fetchRelatedVideos: ${error.message}`);
+      return this.emptyResponse();
+    }
   }
 
   stream(info) {
@@ -292,29 +310,6 @@ class ZiExtractor extends BaseExtractor {
         return video;
       },
     });
-  }
-
-  async fetchRelatedVideos(track, history) {
-    try {
-      let result = [];
-      if (YouTubeSR.YouTube.validate(track.url, 'VIDEO')) {
-        this.log(`Fetching related videos for URL: "${track.url}"`);
-        const video = await YouTubeSR.YouTube.getVideo(track.url);
-        result = video?.videos || [];
-      } else {
-        const searchQuery = track.author && track.author !== 'Unknown' ? track.author : track.title;
-        this.log(`Searching related videos for: "${searchQuery}"`);
-        result = await YouTubeSR.YouTube.search(searchQuery, { limit: 25, type: 'video' });
-      }
-      return this.filterUniqueTracks(result, history);
-    } catch (error) {
-      this.log(`Error in fetchRelatedVideos: ${error.message}`);
-      return [];
-    }
-  }
-
-  filterUniqueTracks(videos, history) {
-    return videos.filter(video => !history.tracks.some(track => track.url === video.url));
   }
 
   log(message) {

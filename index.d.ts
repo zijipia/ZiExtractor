@@ -7,7 +7,7 @@ import {
   ExtractorSearchContext,
   ExtractorStreamable,
   QueryType,
-  Playlist
+  Playlist,
 } from 'discord-player';
 import { Readable } from 'stream';
 
@@ -38,8 +38,7 @@ declare class ZiExtractor extends BaseExtractor<ZiExtractorInit> {
   stream(info: Track): Promise<ExtractorStreamable>;
   emptyResponse(): ExtractorInfo;
   createTrack(data: any, query: string, context: ExtractorSearchContext): Track;
-  fetchRelatedVideos(track: Track, history: GuildQueueHistory): Promise<any[]>;
-  filterUniqueTracks(videos: any[], history: GuildQueueHistory): any[];
+  createYTTrack(video: any, context: ExtractorSearchContext, playlist?: Playlist | null): Track;
   private log(message: string): void;
 }
 
