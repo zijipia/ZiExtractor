@@ -149,14 +149,19 @@ class ZiExtractor extends BaseExtractor {
     return tracks.length ? { playlist: null, tracks } : this.emptyResponse();
   }
 
-  async searchYouTube(query, options = {}) {
+  async searchYouTube(query, context = {}) {
     try {
       const results = await YouTubeSR.YouTube.search(query, {
         type: 'video',
-        safeSearch: options.safeSearch,
-        requestOptions: options,
+        safeSearch: context.requestOptions?.safeSearch,
+        requestOptions: context.requestOptions,
       });
-      return results || [];
+
+      if (!results || !results.length) {
+        return [];
+      }
+
+      return results.map(video => this.createYTTrack(video, context));
     } catch (error) {
       this.log(`Error in searchYouTube: ${error.message}`);
       return [];
@@ -291,15 +296,15 @@ class ZiExtractor extends BaseExtractor {
   }
 
   createYTTrack(video, context, playlist = null) {
-    this.log(`Video: "${video?.title.slice(0, 70)}..."`);
+    this.log(`Video: "${video?.title?.slice(0, 70)}..."`);
     return new Track(this.context.player, {
-      title: video.title,
+      title: video?.title || 'Unknown Title',
       description: video?.description,
-      author: video.channel?.name,
-      url: video.url,
+      author: video?.channel?.name,
+      url: video?.url,
       requestedBy: context?.requestedBy,
-      thumbnail: video.thumbnail?.displayThumbnailURL('maxresdefault') || video.thumbnail.url,
-      views: video.views,
+      thumbnail: video.thumbnail?.displayThumbnailURL?.('maxresdefault') || video.thumbnail.url || video.thumbnail,
+      views: video?.views,
       duration: video?.durationFormatted || Util.buildTimeCode(Util.parseMS(video.duration * 1e3)),
       source: 'youtube',
       raw: video,
@@ -309,6 +314,7 @@ class ZiExtractor extends BaseExtractor {
       async requestMetadata() {
         return video;
       },
+      live: video?.live,
     });
   }
 
