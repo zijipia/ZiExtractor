@@ -6,11 +6,12 @@ import {
   ExtractorInfo,
   ExtractorSearchContext,
   ExtractorStreamable,
-  QueryType,
   Playlist,
+  Player,
+  VoiceConnection,
 } from 'discord-player';
 import { Readable } from 'stream';
-
+import { Client, User } from 'discord.js';
 interface ZiExtractorInit {
   createStream?: (info: Track) => Promise<Readable | string>;
 }
@@ -27,11 +28,10 @@ declare class ZiExtractor extends BaseExtractor<ZiExtractorInit> {
   deactivate(): Promise<void>;
   validate(query: string, type?: SearchQueryType | null | undefined): boolean;
   handle(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
-  isYouTubeQuery(query: string): boolean;
   handleYouTubeQuery(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
   handleNonYouTubeQuery(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
   fallbackToYouTubeSearch(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
-  searchYouTube(query: string, options?: any): Promise<any[]>;
+  searchYouTube(query: string, context?: ExtractorSearchContext): Promise<Track[]>;
   handlePlaylist(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
   handleVideo(query: string, context: ExtractorSearchContext): Promise<ExtractorInfo>;
   getRelatedTracks(track: Track, history: GuildQueueHistory): Promise<ExtractorInfo>;
@@ -42,4 +42,31 @@ declare class ZiExtractor extends BaseExtractor<ZiExtractorInit> {
   private log(message: string): void;
 }
 
-export { ZiExtractor };
+interface SpeechOptions {
+  ignoreBots?: boolean;
+  minimalVoiceMessageDuration?: number;
+  lang?: string;
+  key?: string;
+  profanityFilter?: boolean;
+}
+
+declare class ZiVoiceExtractor extends EventEmitter {
+  constructor(player: Player, speechOptions?: SpeechOptions);
+
+  debug(message: string): void;
+  handleSpeakingEvent(client: Client, connection: VoiceConnection, options: SpeechOptions): void;
+  processVoiceCommand(
+    client: Client,
+    bufferData: Buffer[],
+    user: User,
+    connection: VoiceConnection,
+    options: SpeechOptions
+  ): Promise<void>;
+  checkAudioQuality(pcmBuffer: Buffer): boolean;
+  resolveSpeechWithGoogleSpeechV2(audioBuffer: Buffer, options: SpeechOptions): Promise<string>;
+  convertStereoToMono(stereoBuffer: Buffer): Buffer;
+}
+
+declare function useZiVoiceExtractor(player?: Player, speechOptions?: SpeechOptions): ZiVoiceExtractor;
+
+export { ZiExtractor, ZiVoiceExtractor, useZiVoiceExtractor };
