@@ -140,6 +140,7 @@ When initializing ZiVoiceExtractor, you can provide the following options:
 
 - `ignoreBots`: (boolean) Whether to ignore voice input from bots.
 - `minimalVoiceMessageDuration`: (number) Minimum duration of voice input to process (in seconds).
+- `focusUser`: (string) The user ID to focus on.
 - `lang`: (string) The language code for speech recognition (e.g., 'en-US', 'fr-FR').
 - `key`: (string) Your Google Speech API key (optional).
 - `profanityFilter`: (boolean) Whether to enable the profanity filter.

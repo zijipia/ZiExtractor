@@ -32,6 +32,7 @@ class ZiVoiceExtractor extends EventEmitter {
     super();
     this.speechOptions = {
       ignoreBots: true,
+      focusUser: '',
       minimalVoiceMessageDuration: 1,
       lang: 'vi-VN',
       ...speechOptions,
@@ -49,6 +50,10 @@ class ZiVoiceExtractor extends EventEmitter {
       const user = client.users.cache.get(userId);
       if (!user || (this.speechOptions.ignoreBots && user.bot)) {
         this.debug(`User ${userId} is a bot`);
+        return;
+      }
+      if (this.speechOptions.focusUser && userId !== this.speechOptions.focusUser) {
+        this.debug(`User ${userId} is not in focus`);
         return;
       }
 

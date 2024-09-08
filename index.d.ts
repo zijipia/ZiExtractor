@@ -45,6 +45,7 @@ declare class ZiExtractor extends BaseExtractor<ZiExtractorInit> {
 interface SpeechOptions {
   ignoreBots?: boolean;
   minimalVoiceMessageDuration?: number;
+  focusUser?: User;
   lang?: string;
   key?: string;
   profanityFilter?: boolean;
