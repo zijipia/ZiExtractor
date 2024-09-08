@@ -51,7 +51,7 @@ interface SpeechOptions {
 }
 
 declare class ZiVoiceExtractor extends EventEmitter {
-  constructor(player: Player, speechOptions?: SpeechOptions);
+  constructor(speechOptions?: SpeechOptions);
 
   debug(message: string): void;
   handleSpeakingEvent(client: Client, connection: VoiceConnection, options: SpeechOptions): void;
@@ -67,6 +67,6 @@ declare class ZiVoiceExtractor extends EventEmitter {
   convertStereoToMono(stereoBuffer: Buffer): Buffer;
 }
 
-declare function useZiVoiceExtractor(player?: Player, speechOptions?: SpeechOptions): ZiVoiceExtractor;
+declare function useZiVoiceExtractor(speechOptions?: SpeechOptions): ZiVoiceExtractor;
 
 export { ZiExtractor, ZiVoiceExtractor, useZiVoiceExtractor };
