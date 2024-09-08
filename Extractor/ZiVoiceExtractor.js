@@ -44,9 +44,14 @@ class ZiVoiceExtractor extends EventEmitter {
   }
 
   handleSpeakingEvent(client, connection, options) {
+    this.debug('handle Speaking Event ');
     connection.receiver.speaking.on('start', userId => {
+      this.debug(`User ${userId} is speaking`);
       const user = client.users.cache.get(userId);
-      if (!user || (this.speechOptions.ignoreBots && user.bot)) return;
+      if (!user || (this.speechOptions.ignoreBots && user.bot)) {
+        this.debug(`User ${userId} is a bot`);
+        return;
+      }
 
       const opusStream = connection.receiver.subscribe(userId, {
         end: {

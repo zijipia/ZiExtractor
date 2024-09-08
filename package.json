@@ -1,6 +1,6 @@
 {
   "name": "ziextractor",
-  "version": "1.1.1",
+  "version": "2.1.1",
   "description": "Extractor using cobalt tools and youtube-sr for discord-player v6",
   "main": "index.js",
   "scripts": {
