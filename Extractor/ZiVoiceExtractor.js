@@ -28,9 +28,8 @@ class PcmStream extends Transform {
 }
 
 class ZiVoiceExtractor extends EventEmitter {
-  constructor(player, speechOptions = {}) {
+  constructor(speechOptions = {}) {
     super();
-    this.player = player;
     this.speechOptions = {
       ignoreBots: true,
       minimalVoiceMessageDuration: 1,
@@ -175,13 +174,13 @@ class ZiVoiceExtractor extends EventEmitter {
 const useZiVoiceExtractor = (() => {
   let instance = null;
 
-  return (player, speechOptions) => {
+  return speechOptions => {
     if (!instance) {
-      if (player && speechOptions) {
-        instance = new ZiVoiceExtractor(player, speechOptions);
+      if (speechOptions) {
+        instance = new ZiVoiceExtractor(speechOptions);
       } else {
         throw new Error(
-          'ZiVoiceExtractor has not been initialized. Please provide player and speechOptions when calling for the first time.'
+          'ZiVoiceExtractor has not been initialized. Please provide speechOptions when calling for the first time.'
         );
       }
     }

@@ -62,7 +62,6 @@ const { ZiVoiceExtractor, useZiVoiceExtractor } = require('zivoiceextractor');
 Then, initialize the extractor with your Discord player instance and speech options:
 
 ```js
-const player = / your discord-player instance /;
 const speechOptions = {
   ignoreBots: true,
   minimalVoiceMessageDuration: 1,
@@ -70,7 +69,7 @@ const speechOptions = {
   key: 'YOUR_GOOGLE_SPEECH_API_KEY', // Optional: Provide your own API key
   profanityFilter: false, // Optional: Enable/disable profanity filter
 };
-const voiceExtractor = useZiVoiceExtractor(player, speechOptions);
+const voiceExtractor = useZiVoiceExtractor(speechOptions);
 ```
 
 ### Handling Voice Input
