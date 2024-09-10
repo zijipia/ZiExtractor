@@ -1,8 +1,30 @@
 const { BaseExtractor, QueryType, Track, Playlist } = require('discord-player');
 const { unfurl } = require('unfurl.js');
 const YouTubeSR = require('youtube-sr');
+const ytdl = require('@distube/ytdl-core');
 
-async function getStream(query) {
+async function getStream(query, extractor) {
+  if (query.source == 'youtube') {
+    extractor.log(`use [distube] getInfo: ${query.url}`);
+    const info = await ytdl.getInfo(query.url);
+
+    const formats = info.formats
+      .filter(
+        format =>
+          format.hasAudio &&
+          format.url.includes('c=IOS') &&
+          !format.url.includes('c=ANDROID') &&
+          !format.url.includes('c=WEB') &&
+          (!info.videoDetails.isLiveContent || format.isHLS)
+      )
+      .sort((a, b) => Number(b.audioBitrate) - Number(a.audioBitrate));
+
+    const fmt = formats.find(format => !format.hasVideo) || formats[0];
+    const url = fmt?.url;
+    extractor.log(`success use [distube] get Stream source: ${url}`);
+    if (url) return url;
+  }
+  extractor.log(`use [cobalt] getStream: ${query.url}`);
   try {
     const response = await fetch('https://api.cobalt.tools/api/json', {
       method: 'POST',
@@ -12,14 +34,16 @@ async function getStream(query) {
       },
       body: JSON.stringify({ url: query.url, isAudioOnly: true }),
     });
-
     const data = await response.json();
+    extractor.log(`use [cobalt] response: ${data}`);
     return data.url;
   } catch (error) {
+    extractor.log(`Error in getStream: ${error.message}`);
     console.error(`Error in getStream: ${error.message}`);
     return null;
   }
 }
+
 function isValidUrl(string) {
   try {
     new URL(string);
@@ -259,7 +283,7 @@ class ZiExtractor extends BaseExtractor {
 
   stream(info) {
     this.log(`Streaming info for: ${info.url}`);
-    return this._stream(info);
+    return this._stream(info, this);
   }
 
   emptyResponse() {
