@@ -240,10 +240,13 @@ class ZiExtractor extends BaseExtractor {
         return this.emptyResponse();
       }
 
-      const video = await YouTubeSR.YouTube.getVideo(
+      const video = await YouTubeSR.YouTube.searchOne(
         `https://www.youtube.com/watch?v=${videoId}`,
+        'video',
+        null,
         context.requestOptions
       );
+
       if (!video) {
         this.log(`No video found for ID: "${videoId}"`);
         return this.emptyResponse();
